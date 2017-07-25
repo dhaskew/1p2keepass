@@ -16,6 +16,8 @@
 
 require "optparse"
 require "ostruct"
+require "rexml/document"
+include REXML
 require "pry"
 
 accepted_formats = [".txt", ".1pif"]
@@ -104,7 +106,7 @@ elsif File.extname(filename) =~ /.1pif/i
 
   # Import 1PIF
   JSON.parse("[#{pif}]", symbolize_names: true).each do |entry|
-    puts entry if entry[:typeName] != "webforms.WebForm"
+    #puts entry if entry[:typeName] != "webforms.WebForm"
     next unless entry[:typeName] == "webforms.WebForm"
     next if entry[:secureContents][:fields].nil?
 
@@ -130,11 +132,25 @@ elsif File.extname(filename) =~ /.1pif/i
   end
 end
 
-puts "Read #{passwords.length} passwords."
+#puts "Read #{passwords.length} passwords."
 
 errors = []
+
+doc = Document.new 
+database = doc.add_element 'database'
+group = database.add_element 'group'
+group.add_element('title').text = 'Internet'
+group.add_element('icon').text = '1'
+
 # Save the passwords
 passwords.each do |pass|
+
+  entryNode = group.add_element 'entry'
+  entryNode.add_element('username').text = pass[:login]
+  entryNode.add_element('password').text = pass[:password]
+  entryNode.add_element('title').text = pass['title']
+  entryNode.add_element('url').text = pass[:url]
+  entryNode.add_element('comment').text = pass[:notes]
   #binding.pry
 =begin
   IO.popen("pass insert #{"-f " if options.force}-m \"#{pass[:name]}\" > /dev/null", "w") do |io|
@@ -147,13 +163,17 @@ passwords.each do |pass|
   end
 =end
   if true # $? == 0
-    puts pass
+    #puts pass
+    #puts "username: #{pass[:login]} - Password: #{pass[:password]}" 
     #puts "Imported #{pass[:name]}"
   else
     $stderr.puts "ERROR: Failed to import #{pass[:name]}"
     errors << pass
   end
 end
+
+doc << XMLDecl.new
+doc.write($stdout,2)
 
 if errors.length > 0
   $stderr.puts "Failed to import #{errors.map {|e| e[:name]}.join ", "}"
